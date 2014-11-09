@@ -1,0 +1,22 @@
+{
+  "name": "portal",
+  "version": "1.0.0",
+  "description": "SWEET captive portal and chat server",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@10.122.46.131/portal.git"
+  },
+  "author": "Peter McCann",
+  "license": "proprietary",
+  "dependencies": {
+    "express": "^4.9.8",
+    "mongodb": "^1.4.19",
+    "zmq": "^2.8.0",
+    "socket.io": "^1.2.0",
+    "node-uuid": "^1.4.1"
+  }
+}

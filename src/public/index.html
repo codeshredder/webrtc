@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>chat demo</title>
+    <link rel="stylesheet" type="text/css" href="css/main.css">
+    <script src="javascripts/jquery.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="javascripts/adapter.js"></script>
+    <script src="javascripts/signaling.js"></script>
+</head>
+<body>
+    <h1>chat demo</h1>
+    <div>
+        <span id="status">Start</span>
+        <input type="text" id="input"/>
+    </div>
+    <div id="content"></div>
+
+    <div>
+        <button id="startButton">Start</button>
+        <video id="localVideo"></video>
+        <video id="remoteVideos"></video>
+    </div>
+
+</body>
+</html>
