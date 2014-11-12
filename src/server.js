@@ -94,13 +94,13 @@ io.on('connection', function (socket) {
         sessions[client.session][id].socket.emit('signaling', msg);
       }
     }
-    else if ((json.type === 'offer') || (json.type === 'answer')) {
-      console.log(json.type + ": " + client.name + "\r\n" + json.sdp);
+    else if (json.type === 'stream') {
+      console.log(json.type + ": " + client.name + "\r\n" + json.desc);
 
       // notice session members
       msg['type'] = json.type;
       msg['name'] = client.name;
-      msg['sdp'] = json.sdp;
+      msg['desc'] = json.desc;
 
       for (var id in sessions[client.session]) {
         sessions[client.session][id].socket.emit('signaling', msg);

@@ -69,23 +69,23 @@
 
             p = '<p><span style="color:'+json.color+';">' + json.name+'</span> @ '+ json.time+ ' : '+ json.text +'</p>';
         }
-        else if(json.type == 'video') {
+        else if(json.type == 'stream') {
 
             p = '<p><span style="color:'+json.color+';">' + json.name+'</span> @ '+ json.time+ ' : send video </p>';
 
             // get remote video
-            /*if (json.sdp) {
+            if (json.desc) {
                 if (!localPeerConnection) {
                     var server = null;
                     localPeerConnection = new RTCPeerConnection(server);
                 }
-                localPeerConnection.setRemoteDescription(new RTCSessionDescription(JSON.stringify({ "sdp": json.sdp})), function () {
+                localPeerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(json.desc)), function () {
                     // if we received an offer, we need to answer
                     if (localPeerConnection.remoteDescription.type == "offer") {
                         localPeerConnection.createAnswer(localDescCreated, logError);
                     }
                 }, logError);
-            }*/
+            }
         }
 
         content.prepend(p); 
@@ -156,14 +156,14 @@
 
             // send sdp to peer
             var msg = {};
-            msg['type'] = desc.type;
-            msg['sdp'] = desc.sdp;
+            msg['type'] = 'stream';
+            msg['desc'] = JSON.stringify(desc);
             client.socket.emit('signaling', msg);
 
         }, logError);
     }
 
     function logError(error) {
-        log(error.name + ": " + error.message);
+        console.log(error.name + ": " + error.message);
     }
 });
