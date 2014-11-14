@@ -7,18 +7,25 @@ webrtc demo
 workflow
 ------
 
-A                      server                B
 
-  name   - register ->
+  A                  server                B
+
+        - register ->
+
         <- ok -
-                               <- register - name
-                               - ok ->
-        - call ->   create session/find B     
-                               - call ->
+                             <- register -
+
+                              - ok ->
+
+       - call ->   create session/find B     
+
+                              - call ->
+
                                <- accept -
+
         <- accept -
 
-        - offer ->
+       - offer ->
                                - offer ->
         - candidate ->
                                - candidate ->
