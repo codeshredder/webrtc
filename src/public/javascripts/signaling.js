@@ -5,93 +5,95 @@
 
     var localVideo = document.getElementById("localVideo");
     var remoteVideo = document.getElementById("remoteVideo");
-    var startButton = document.getElementById("startButton");
-    startButton.onclick = start;
+    var videoCall = document.getElementById("videoCall");
+    videoCall.onclick = startVideo;
 
     var localPeerConnection;
 
     var client = {
-        id:false,
-        socket:false,
         name:false,
-        session:false,
-        status:'start',
+        socket:false,
+        status:'init',  // init, connected, registered, talking
     }
 
     //Connecting
     client.status = 'Connecting';
     status.text('Connecting:');
-    client.socket = io.connect('http://192.168.1.102:8080');
+    client.socket = io.connect();
+
+    function sendMessage(type, message) {
+        console.log('sendMessage: '+ type + ' ' + JSON.stringify(message));
+        // if (typeof message === 'object') {
+        //   message = JSON.stringify(message);
+        // }
+        client.socket.emit(type, message);
+    }
 
     //Connected
-    client.socket.on('open',function(){
+    client.socket.on('connect_ack',function() {
         client.status = 'connected';
 
-        status.text('Choose a name:');
+        status.text('register name:');
     });
 
-    // process signaling
-    client.socket.on('signaling',function(json){
-        var p = '';
+    client.socket.on('register_ack', function(json) {
+        console.log('register_ack: ' + json.name);
 
-        if (json.type === 'register') {
-            client.name = json.name;
-            client.id = json.id;
-            client.status = 'registered';
+        client.name = json.name;
+        client.status = 'registered';
 
-            status.text('Create or join a session:');
-        } 
-        else if (json.type === 'create') {
-            client.session = json.session;
+        status.text('call name:');
+    });
+
+    client.socket.on('invite', function(json) {
+        console.log('invite: ' + json.caller + " call " + json.callee);
+
+        var p = '<p style="background:'+client.color+'">system  @ '+ json.time+ ' : ' + json.caller + ' call ' + json.callee +'</p>';
+        content.prepend(p);
+
+        // add user choose accept or refuse
+        client.status = 'talking';
+        status.text(client.name + ': ').css('color', json.color);
+
+        var msg = json;
+        msg['result'] = 'ok';
+        sendMessage('invite_ack', msg);
+    });
+
+    client.socket.on('invite_ack', function(json) {
+        console.log('invite_ack: ' + json.caller + ' call ' + json.callee + ' ' + json.result);
+
+        if (json.result === 'ok') {
             client.status = 'talking';
             status.text(client.name + ': ').css('color', json.color);
-
-            p = '<p style="background:'+client.color+'">system  @ '+ json.time+ ' : create ' + json.session +'</p>';
-        }
-        else if (json.type === 'join') {
-            if (client.name === json.name) {
-                client.session = json.session;
-                client.status = 'talking';
-                status.text(client.name + ': ').css('color', json.color);
-            }
-
-            p = '<p style="background:'+json.color+'">system  @ '+ json.time+ ' : ' + json.name +' join ' + json.session + '</p>';
-        }
-        else if(json.type == 'quit') {
-            if (client.name === json.name) {
-                client.session = false;
-                client.status = 'registered';
-            }
-
-            p = '<p style="background:'+json.color+'">system  @ '+ json.time+ ' : ' + json.name +' quit </p>';
-        }
-        else if(json.type == 'message') {
-
-            p = '<p><span style="color:'+json.color+';">' + json.name+'</span> @ '+ json.time+ ' : '+ json.text +'</p>';
-        }
-        else if(json.type == 'stream') {
-
-            p = '<p><span style="color:'+json.color+';">' + json.name+'</span> @ '+ json.time+ ' : send video </p>';
-
-            // get remote video
-            if (json.desc) {
-                if (!localPeerConnection) {
-                    var server = null;
-                    localPeerConnection = new RTCPeerConnection(server);
-                }
-                localPeerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(json.desc)), function () {
-                    // if we received an offer, we need to answer
-                    if (localPeerConnection.remoteDescription.type == "offer") {
-                        localPeerConnection.createAnswer(localDescCreated, logError);
-                    }
-                }, logError);
-            }
         }
 
+        var p = '<p style="background:'+client.color+'">system  @ '+ json.time+ ' : ' + json.caller + ' call ' + json.callee + ' '+ json.result +'</p>';
         content.prepend(p); 
     });
 
-    // press 'Enter' to send msg
+    client.socket.on('quit', function(json) {
+        console.log('quit: ' + json.name);
+
+        if (client.name === json.name) {
+            client.status = 'registered';
+            status.text('call name:');
+
+            mediaStop();
+        }
+
+        var p = '<p style="background:'+client.color+'">system  @ '+ json.time+ ' : ' + json.name + ' quit </p>';
+        content.prepend(p); 
+    });
+
+    client.socket.on('message', function(json) {
+        console.log('message: ' + json.name);
+
+        var p = '<p style="color:'+json.color+';">' + json.name+' @ '+ json.time+ ' : '+ json.text +'</p>';
+        content.prepend(p); 
+    });
+
+     // press 'Enter' to send msg
     input.keydown(function(e) {
         if (e.keyCode === 13) {
             var msg = {};
@@ -100,26 +102,22 @@
             if (client.status === "connected") {
                 if (!text) return;
 
-                msg['type'] = 'register';
                 msg['name'] = text;
-                client.socket.emit('signaling', msg);
+                sendMessage('register', msg);
+
             } else if (client.status === "registered") {
-                if (!text) {
-                    msg['type'] = 'create';
-                    msg['name'] = client.name;
-                    client.socket.emit('signaling', msg);
-                } else {
-                    msg['type'] = 'join';
-                    msg['session'] = text;
-                    client.socket.emit('signaling', msg);
-                }
+                if (!text) return;
+
+                msg['caller'] = client.name;
+                msg['callee'] = text;
+                sendMessage('invite', msg);
             }
             else if (client.status === "talking") {
                 if (!text) return;
 
-                msg['type'] = 'message';
+                msg['name'] = client.name;
                 msg['text'] = text;
-                client.socket.emit('signaling', msg);
+                sendMessage('message', msg);
             }
 
             $(this).val('');
@@ -127,16 +125,64 @@
     });
 
 
-    function start() {
+    // for media call
+    var sdpConstraints = {'mandatory': {
+        'OfferToReceiveAudio':true,
+        'OfferToReceiveVideo':true }};
+
+    function startVideo () {
         if (!localPeerConnection) {
-            var server = null;
-            localPeerConnection = new RTCPeerConnection(server);
+          mediaStart();
         }
+    }
+
+    client.socket.on('media', function(message) {
+        console.log('media: ' + JSON.stringify(message));
+
+        if (message.type === 'offer') {
+            if (!localPeerConnection) {
+              mediaStart();
+            }
+            localPeerConnection.setRemoteDescription(new RTCSessionDescription(message));
+            localPeerConnection.createAnswer(localDescCreated, null, sdpConstraints);
+        
+        } else if (message.type === 'answer' && localPeerConnection) {
+            localPeerConnection.setRemoteDescription(new RTCSessionDescription(message));
+        
+        } else if (message.type === 'candidate' && localPeerConnection) {
+            var candidate = new RTCIceCandidate({
+                sdpMLineIndex: message.label,
+                candidate: message.candidate
+                });
+            localPeerConnection.addIceCandidate(candidate);
+        }
+    });
+
+    function mediaStart() {
+        var server = null;
+        localPeerConnection = new RTCPeerConnection(server);
+
+        localPeerConnection.onicecandidate = function (event) {
+            console.log('handleIceCandidate event: ', event);
+            if (event.candidate) {
+                sendMessage('media', {
+                    type: 'candidate',
+                    label: event.candidate.sdpMLineIndex,
+                    id: event.candidate.sdpMid,
+                    candidate: event.candidate.candidate});
+            } else {
+                console.log('End of candidates.');
+            }
+        };
 
         // once remote stream arrives, show it in the remote video element
         localPeerConnection.onaddstream = function (event) {
             remoteVideo.src = URL.createObjectURL(event.stream);
             remoteVideo.play();
+        };
+
+        localPeerConnection.onremovestream = function (event) {
+            console.log('Remote stream removed. Event: ', event);
         };
 
         // get a local stream, show it in a self-view and add it to be sent
@@ -146,7 +192,6 @@
             
             localPeerConnection.addStream(stream);
             localPeerConnection.createOffer(localDescCreated, logError);
-
         }, logError);
     }
 
@@ -155,15 +200,22 @@
             console.log('setLocalDescription: ' + desc.type + "\r\n"+ desc.sdp)
 
             // send sdp to peer
-            var msg = {};
-            msg['type'] = 'stream';
-            msg['desc'] = JSON.stringify(desc);
-            client.socket.emit('signaling', msg);
+            var msg = desc;
+            sendMessage('media', msg);
 
         }, logError);
     }
 
+    function mediaStop() {
+        if (!localPeerConnection) {
+            localPeerConnection.close();
+            localPeerConnection = null;
+        }
+    }
+
+
     function logError(error) {
         console.log(error.name + ": " + error.message);
     }
+
 });

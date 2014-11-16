@@ -19,124 +19,153 @@ var sessions = {};
 var clients = {};
 
 
+function sendMessage(socket, type, message){
+    console.log('sendMessage: '+ type + ' ' + JSON.stringify(message));
+    // if (typeof message === 'object') {
+    //   message = JSON.stringify(message);
+    // }
+    socket.emit(type, message);
+}
+
 io.on('connection', function (socket) {
+
   // tell client connected
-  socket.emit('open');
+  socket.emit('connect_ack');
 
   // console.log(socket.handshake);
 
   var client = {
-    id:false,
-    socket:socket,
     name:false,
+    socket:socket,
     session:false,
     color:getColor()
   }
-  
-  // process signaling
-  socket.on('signaling', function(json){
-    var msg = {time:getTime(),color:client.color};
 
-    if (json.type === 'register') {
-      console.log(json.type + ": " + json.name);
+  socket.on('register', function(json) {
+    console.log('register: ' + json.name);
 
-      client.name = json.name;
-      client.id = uuid();
-      clients[client.id] = client;
+    // add  client
+    client.name = json.name;
+    clients[client.name] = client;
 
-      msg['type'] = 'register';
-      msg['id'] = client.id;
-      msg['name'] = client.name;
-      socket.emit('signaling', msg);
+    var msg = {};
+    msg['time'] = getTime();
+    msg['color'] = client.color;
+    msg['name'] = client.name;
+    msg['result'] = 'ok';
+    sendMessage(client.socket,'register_ack', msg);
+  });
+
+  socket.on('invite', function(json) {
+    console.log('invite: ' + json.caller + ' call ' + json.callee);
+
+    var msg = json;
+    msg['time'] = getTime();
+    msg['color'] = client.color;
+    if (clients[json.callee]) {
+      sendMessage(clients[json.callee].socket,'invite', msg);
+    } else if (clients[json.caller]) {
+      msg['result'] = 'no exist';
+      sendMessage(clients[json.caller].socket,'invite_ack', msg);
     }
-    else if (json.type === 'create') {
+  });
 
-      // create seesion
-      client.session = uuid();
-      sessions[client.session] = {};
-      sessions[client.session][client.id] = client;
-
-      console.log(json.type + ": " + json.name + ' ' + client.session);
-
-      // notice
-      msg['type'] = 'create';
-      msg['session'] = client.session;
-      socket.emit('signaling', msg);
+  socket.on('invite_ack', function(json) {
+    console.log('invite_ack: ' + json.caller + ' call ' + json.callee);
+    
+    if (json.result === 'ok') {
+      // add session
+      var session = uuid();
+      sessions[session] = {};
+      sessions[session][json.caller] = clients[json.caller];
+      sessions[session][json.callee] = clients[json.callee];
+      clients[json.caller].session = session;
+      clients[json.callee].session = session;
     }
-    else if (json.type === 'join') {
-      console.log(json.type + ": " + client.name + " " + json.session);
 
-      if ((json.session)&&(sessions[json.session])) {
+    var msg = json;
+    msg['time'] = getTime();
+    msg['color'] = client.color;
+    sendMessage(clients[json.caller].socket,'invite_ack', msg);
+  });
 
-        // join session
-        client.session = json.session;
-        sessions[json.session][client.id] = client;
+  socket.on('message', function(json) {
+    console.log('message: '+ ": " + client.name + " " + json.text);
 
-        // notice session members
-        msg['type'] = 'join';
-        msg['name'] = client.name;
-        msg['session'] = client.session;
+    // notice session members
+    var msg = json;
+    msg['time'] = getTime();
+    msg['color'] = client.color;
+    for (var name in sessions[client.session]) {
+      sendMessage(sessions[client.session][name].socket, 'message', msg);
+    }
+  });
 
-        for (var id  in sessions[json.session]) {
-          sessions[client.session][id].socket.emit('signaling', msg);
-        }
+  socket.on('media', function(json) {
+    console.log('media: '+ JSON.stringify(json));
+
+    // notice session members
+    var msg = json;
+    for (var name in sessions[client.session]) {
+      if (sessions[client.session][name].name !== client.name) {
+        sendMessage(sessions[client.session][name].socket, 'media', msg);
       }
     }
-    else if (json.type === 'message') {
-      console.log(json.type + ": " + client.name + " " + json.text);
-
-      // notice session members
-      msg['type'] = 'message';
-      msg['name'] = client.name;
-      msg['text'] = json.text;
-
-      for (var id in sessions[client.session]) {
-        sessions[client.session][id].socket.emit('signaling', msg);
-      }
-    }
-    else if (json.type === 'stream') {
-      console.log(json.type + ": " + client.name + "\r\n" + json.desc);
-
-      // notice session members
-      msg['type'] = json.type;
-      msg['name'] = client.name;
-      msg['desc'] = json.desc;
-
-      for (var id in sessions[client.session]) {
-        sessions[client.session][id].socket.emit('signaling', msg);
-      }
-    }
-
   });
 
   // process disconnect
-  socket.on('disconnect', function () {  
-    console.log("disconnect: " + client.name + " " + client.id + " " + client.session);
+  socket.on('quit', function () {  
+    console.log("quit: " + client.name);
 
     // quit session
-    if ((client.session !== false) && (client.id !== false)) {
-      delete sessions[client.session][client.id];
-      delete clients[client.id];
+    if ((client.session !== false) && (client.name !== false)) {
+      delete sessions[client.session][client.name];
+      delete clients[client.name];
 
       // notice session members
       var msg = {
         time:getTime(),
         color:client.color,
-        type:'quit',
         name:client.name
       };
-
-      for (var id in sessions[client.session]) {
-        sessions[client.session][id].socket.emit('signaling', msg);
+      for (var name in sessions[client.session]) {
+        if (sessions[client.session][name].name !== client.name) {
+          sendMessage(sessions[client.session][name].socket, 'quit', msg);
+        }
       }
 
+      if (!sessions[client.session]) {
+        delete sessions[client.session];
+      }
       client.session = false;
     }
+  });
 
+  // process disconnect
+  socket.on('disconnect', function () {  
+    console.log("disconnect: " + client.name);
+
+    // quit session
+    if ((client.session !== false) && (client.name !== false)) {
+      delete sessions[client.session][client.name];
+      delete clients[client.name];
+
+      // notice session members
+      var msg = {
+        time:getTime(),
+        color:client.color,
+        name:client.name
+      };
+      for (var name in sessions[client.session]) {
+        if (sessions[client.session][name].name !== client.name) {
+          sendMessage(sessions[client.session][name].socket, 'quit', msg);
+        }
+      }
+      client.session = false;
+    }
   });
   
 });
-
 
 var getTime=function(){
   var date = new Date();
