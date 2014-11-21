@@ -29,17 +29,18 @@ function sendMessage(socket, type, message){
 
 io.on('connection', function (socket) {
 
-  // tell client connected
-  socket.emit('connect_ack');
-
-  // console.log(socket.handshake);
-
   var client = {
     name:false,
     socket:socket,
+    ip:socket.request.connection.remoteAddress,
     session:false,
     color:getColor()
   }
+
+  console.log(client.ip + ' connected');
+
+  // tell client connected
+  socket.emit('connect_ack');
 
   socket.on('register', function(json) {
     console.log('register: ' + json.name);
