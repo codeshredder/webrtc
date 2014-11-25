@@ -1,7 +1,8 @@
 
 var express = require('express');
 var app = express();
-var server = require('http').Server(app);
+var http = require('http');
+var server = http.Server(app);
 var io = require('socket.io')(server);
 var uuid = require('node-uuid');
 
@@ -15,9 +16,43 @@ app.get('/', function (req, res) {
 });
 
 
+// rest api
+function getDevice() {
+
+  var options = {
+    hostname: '127.0.0.1',
+    port: 8888,
+    path: '/v2/catalog',
+    method: 'GET',
+    headers: {
+        'Content-type': 'application/json',
+      },
+    auth: 'admin:admin',
+  };
+
+  var req = http.request(options, function(res) {
+    console.log('STATUS: ' + res.statusCode);
+    console.log('HEADERS: ' + JSON.stringify(res.headers));
+
+    res.setEncoding('utf8');
+    res.on('data', function (data) {
+      console.log('BODY: ' + data);
+    });
+  });
+
+  req.on('error', function(err) {
+    console.log('request error: ' + err.message);
+  });
+
+  // write data to request body
+  //req.write('data\n');
+  //req.write('data\n');
+  req.end();
+}
+
+// for webrtc signalling
 var sessions = {};
 var clients = {};
-
 
 function sendMessage(socket, type, message){
     console.log('sendMessage: '+ type + ' ' + JSON.stringify(message));
@@ -121,7 +156,6 @@ io.on('connection', function (socket) {
     // quit session
     if ((client.session !== false) && (client.name !== false)) {
       delete sessions[client.session][client.name];
-      delete clients[client.name];
 
       // notice session members
       var msg = {

@@ -3,10 +3,13 @@
     var status = $('#status');
     var input = $('#input');
 
+    var action = document.getElementById("action");
+    action.onclick = startAction;
+    var showVideo = document.getElementById("showVideo");
+    showVideo.onclick = startVideo;
+
     var localVideo = document.getElementById("localVideo");
     var remoteVideo = document.getElementById("remoteVideo");
-    var videoCall = document.getElementById("videoCall");
-    videoCall.onclick = startVideo;
 
     var localPeerConnection;
 
@@ -34,6 +37,7 @@
         client.status = 'connected';
 
         status.text('register name:');
+        $('#action').text('login');
     });
 
     client.socket.on('register_ack', function(json) {
@@ -43,6 +47,7 @@
         client.status = 'registered';
 
         status.text('call name:');
+        $('#action').text('call');
     });
 
     client.socket.on('invite', function(json) {
@@ -54,6 +59,7 @@
         // add user choose accept or refuse
         client.status = 'talking';
         status.text(client.name + ': ').css('color', json.color);
+        $('#action').text('hang off');
 
         var msg = json;
         msg['result'] = 'ok';
@@ -66,6 +72,7 @@
         if (json.result === 'ok') {
             client.status = 'talking';
             status.text(client.name + ': ').css('color', json.color);
+            $('#action').text('hang off');
         }
 
         var p = '<p style="background:'+client.color+'">system  @ '+ json.time+ ' : ' + json.caller + ' call ' + json.callee + ' '+ json.result +'</p>';
@@ -75,12 +82,11 @@
     client.socket.on('quit', function(json) {
         console.log('quit: ' + json.name);
 
-        if (client.name === json.name) {
-            client.status = 'registered';
-            status.text('call name:');
+        client.status = 'registered';
+        status.text('call name:');
+        $('#action').text('call');
 
-            mediaStop();
-        }
+        mediaStop();
 
         var p = '<p style="background:'+client.color+'">system  @ '+ json.time+ ' : ' + json.name + ' quit </p>';
         content.prepend(p); 
@@ -99,42 +105,64 @@
             var msg = {};
             var text = $(this).val();
 
-            if (client.status === "connected") {
-                if (!text) return;
-
-                msg['name'] = text;
-                sendMessage('register', msg);
-
-            } else if (client.status === "registered") {
-                if (!text) return;
-
-                msg['caller'] = client.name;
-                msg['callee'] = text;
-                sendMessage('invite', msg);
-            }
-            else if (client.status === "talking") {
+            if (client.status === "talking") {
                 if (!text) return;
 
                 msg['name'] = client.name;
                 msg['text'] = text;
                 sendMessage('message', msg);
-            }
 
-            $(this).val('');
+                $(this).val('');
+            }
         }
     });
 
+    // action
+    function startAction () {
+        console.log('startAction: ' + input.val());
+
+        var msg = {};
+        var text = input.val();
+
+        if (client.status === "connected") {
+            if (!text) return;
+
+            msg['name'] = text;
+            sendMessage('register', msg);
+
+            input.val('');
+        } else if (client.status === "registered") {
+            if (!text) return;
+
+            msg['caller'] = client.name;
+            msg['callee'] = text;
+            sendMessage('invite', msg);
+
+            input.val('');
+        } else if (client.status === "talking") {
+
+            msg['name'] = client.name;
+            sendMessage('quit', msg);
+
+            client.status = 'registered';
+            status.text('call name:');
+            $('#action').text('call');
+        }
+    }
 
     // for media call
+    function startVideo () {
+
+        if (client.status === "talking") {
+            if (!localPeerConnection) {
+              mediaStart();
+            }
+        }
+    }
+
     var sdpConstraints = {'mandatory': {
         'OfferToReceiveAudio':true,
         'OfferToReceiveVideo':true }};
-
-    function startVideo () {
-        if (!localPeerConnection) {
-          mediaStart();
-        }
-    }
 
     client.socket.on('media', function(message) {
         console.log('media: ' + JSON.stringify(message));
@@ -207,12 +235,11 @@
     }
 
     function mediaStop() {
-        if (!localPeerConnection) {
+        if (localPeerConnection) {
             localPeerConnection.close();
             localPeerConnection = null;
         }
     }
-
 
     function logError(error) {
         console.log(error.name + ": " + error.message);
