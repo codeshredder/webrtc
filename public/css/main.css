@@ -7,7 +7,7 @@ div {width:auto;}
     display:block;
     float:left;
     margin-top:15px;
-    width:10%;
+    width:20%;
 }
 
 #input {
@@ -38,5 +38,5 @@ div {width:auto;}
     margin-top:10px;
     padding:5px;
     float:left;
-    width:40%;
+    width:50%;
 }
