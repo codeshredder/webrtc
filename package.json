@@ -14,8 +14,7 @@
   "license": "proprietary",
   "dependencies": {
     "express": "^4.9.8",
-    "mongodb": "^1.4.19",
-    "zmq": "^2.8.0",
+    "mongoose": "^1.4.19",
     "socket.io": "^1.2.0",
     "node-uuid": "^1.4.1"
   }
