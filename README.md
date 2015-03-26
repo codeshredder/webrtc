@@ -17,9 +17,11 @@ install node.js
   
   
   ln -s /home/node-v0.10.33-linux-x64/bin/node /usr/local/bin/node
+  
   ln -s /home/node-v0.10.33-linux-x64/bin/npm /usr/local/bin/npm
   
   node -v
+  
   npm -v
 
 
