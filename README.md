@@ -4,7 +4,7 @@ webrtc
 webrtc demo
 
 
-node.js
+install node.js
 ------
 
 
@@ -24,11 +24,13 @@ node.js
 
 
 
-workflow
+run on server
 ------
 
 
 
+run on client
+------
 
 
 
